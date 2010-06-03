@@ -16,3 +16,6 @@ resgrad: resgrad.hs
 
 clean:
 	rm -rf *.o *.hi resgrad *.svg
+
+sclean:
+	rm -rf *.svg

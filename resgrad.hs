@@ -123,7 +123,7 @@ perpCompat pX@(x@(x1,x2):xs) pY@((y1,y2):_)
             | length pX /= y1+y2 = False
             | length pY /= x1+x2 = False
             | otherwise          = perpCompat xs $ reducePerp x pY []
-    where reducePerp (0,0)   []           npY = npY
+    where reducePerp (0,0)   []           npY = reverse npY
           reducePerp (x1,x2) ((y1,y2):ys) npY 
                      | x2 > x1 && x2 /= 0 && y2 /= 0 = reducePerp (x1,x2-1) ys $ (y1,y2-1):npY
                      | x1 > x2 && x1 /= 0 && y1 /= 0 = reducePerp (x1-1,x2) ys $ (y1-1,y2):npY
@@ -162,7 +162,7 @@ svgArray ((l,m):ls) x y dR = svgBox x y serColor ++ svgArray ((l-1,m):ls) x (y+d
 
 svgShowdR dR xos yos =
    "<text x=\""++show xos++"\" y=\""++show yos++"\" font-size=\""++show fSize++"\">"
-   ++(show $ (fromIntegral (round (dR*1e9)))/1e9)++"</text>"
+   ++(show $ (fromIntegral (round (dR*1e12)))/1e12)++"</text>"
 
 svgArray2 pX pY dR = svgArrayP pX pY yMargin
     where svgArrayP _ [(-1,-1)] _ = []  -- error signaled from reducePerp, shouldn't happen!
@@ -181,12 +181,12 @@ svgArray2 pX pY dR = svgArrayP pX pY yMargin
               reducePerp (x1-1,x2) ys (xP+deltaX) yos ((svgBox xP yos serColor)++xLine,(y1-1,y2):npY)
             | otherwise          = ("",[(-1,-1)])
 
-svg1d tRow tRes nRow (x,dR) = svgHeader fName (2*xMargin+tRow*deltaX+9*fSize) (2*yMargin+nRow*deltaY) ++
+svg1d tRow tRes nRow (x,dR) = svgHeader fName (2*xMargin+tRow*deltaX+14*fSize) (2*yMargin+nRow*deltaY) ++
                               svgArray x 0 0 dR ++
                               svgTail
         where fName = show nRow ++ "_" ++ show tRes ++ "_" ++ show dR ++ ".svg"
 
-svg2d tRow tRes nRow (x,y,dR) = svgHeader fName (2*xMargin+tRow*deltaX) (2*yMargin+nRow*deltaY+2*fSize) ++
+svg2d tRow tRes nRow (x,y,dR) = svgHeader fName (max (2*xMargin+tRow*deltaX) (14*fSize)) (2*yMargin+nRow*deltaY+2*fSize) ++
                                 svgArray2 x y dR ++
                                 svgTail
         where fName = show nRow ++ "_" ++ show tRes ++ "_" ++ show dR ++ ".svg"
