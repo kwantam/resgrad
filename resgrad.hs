@@ -46,6 +46,7 @@ import Data.List (foldl', sortBy)
 import Control.Parallel.Strategies (NFData(..),rnf)
 import Control.Parallel (par)
 import System (getArgs,getProgName,exitFailure)
+import Data.Maybe (fromMaybe,Maybe(..))
 
 -- compute the gain given dR and a specification of resistors by row
 resGainL dR nSx = seriesValue / parallelValue
@@ -72,14 +73,16 @@ optimalN tRow tRes nRow dR =
 optimalNLs tRow tRes nRow dR =
            sortBy cmpErr (zipGains dR (fromIntegral $ tRes^2) (genRows tRow tRes nRow))
 
--- create a list of 2-d resistor configurations (up to nx*ny in length)
+-- create a list of 2-d resistor configurations (up to nP in length)
 -- optimizing for combined gradient insensitivity in X and Y directions
--- nx and ny should be on the order of 5ish probably
 optimalNLs2dS tRow tRes nRow dRx dRy nP = rnf xs `par` rnf ys `seq` take nP $ combPerpsS xs ys
     where xs = take (2*nP) $ optimalNLs tRow tRes nRow (dRx / (fromIntegral $ nRow - 1))
           ys = take (2*nP) $ optimalNLs nRow tRes tRow (dRy / (fromIntegral $ tRow - 1))
 
 -- zip together config and corresponding gain error, normalizing to dVal (the expected gain)
+-- this version splits the rows to compute into two lists and computes them in parallel
+-- it would be better to detect how many processes are being run and split into a
+-- corresponding number of threads
 zipGains dR dVal rows = rnf v1 `par` rnf v2 `seq` zipX rows v1 v2
     where zipX (r:rs) (v1:v1s) v2s = (r,v1) : zipX rs v1s v2s
           zipX (r:rs) []  (v2:v2s) = (r,v2) : zipX rs [] v2s
@@ -94,7 +97,7 @@ zipGains dR dVal rows = rnf v1 `par` rnf v2 `seq` zipX rows v1 v2
 -- combine one spec with a list of perpendicular ones which may or may not be compatible
 combPerp _       []           = []
 combPerp (rx,dx) ((ry,dy):ys) 
-           | perpCompat rx ry = (rx,ry,dx*dy) : combPerp (rx,dx) ys
+           | perpCompat2 rx ry = (rx,ry,dx*dy) : combPerp (rx,dx) ys
            | otherwise        = combPerp (rx,dx) ys
 
 -- combine two lists of perpendicular specs
@@ -130,6 +133,24 @@ perpCompat pX@(x@(x1,x2):xs) pY@((y1,y2):_)
                      | x2 /= 0 && y2 /= 0 = reducePerp (x1,x2-1) ys $ (y1,y2-1):npY
                      | x1 /= 0 && y1 /= 0 = reducePerp (x1-1,x2) ys $ (y1-1,y2):npY
                      | otherwise          = [(-1,-1)]
+
+-- second attempt at perpendicular spec compatibility test
+-- this time, we include backtracking when we have a
+-- choice between placing a P or an S
+perpCompat2 pX@((x1,x2):_) pY@((y1,y2):_)
+             | length pX /= y1+y2 = False
+             | length pY /= x1+x2 = False
+             | otherwise          = reducePerp pX pY []
+    where reducePerp []           _            []  = True
+          reducePerp (( 0, 0):xs) []           npY = reducePerp xs (reverse npY) []
+          reducePerp ((x1,x2):xs) ((y1,y2):ys) npY
+             | x2 > x1 && x1 > 0 && y2 /= 0 = rPx2 || rPx1
+             | x1 > x2 && x2 > 0 && y1 /= 0 = rPx1 || rPx2
+             | x2 /= 0 && y2 /= 0           = rPx2
+             | x1 /= 0 && y1 /= 0           = rPx1
+             | otherwise                    = False
+                 where rPx1 = reducePerp ((x1-1,x2):xs) ys ((y1-1,y2):npY)
+                       rPx2 = reducePerp ((x1,x2-1):xs) ys ((y1,y2-1):npY)
 
 optSizes = [(14,14,2),(10,15,3),(7,14,4),(6,15,5),(5,15,6),(4,14,7),(4,16,8),(4,18,9),(3,15,10)]
 optimals dR = map (\(x,y,z) -> optimalN x y z dR) optSizes
@@ -180,6 +201,17 @@ svgArray2 pX pY dR = svgArrayP pX pY yMargin
             | x1 /= 0 && y1 /= 0 =
               reducePerp (x1-1,x2) ys (xP+deltaX) yos ((svgBox xP yos serColor)++xLine,(y1-1,y2):npY)
             | otherwise          = ("",[(-1,-1)])
+
+{-
+svgArray22 pX@((x1,x2):_) pY@((y1,y2):_) dR
+            | length pX /= y1+y2 = False
+            | length pY /= x1+x2 = False
+            | otherwise          = fromMaybe "" $ reducePerp pX pY [] xMargin 0
+    where reducePerp []           _            []  _   yos = Just $ svgShowdR dR (2*xMargin) (yos+deltaY)
+          reducePerp (( 0, 0):xs) []           npY _   yos = reducePerp xs (reverse npY) xMargin (yos+deltaY)
+          reducePerp ((x1,x2):xs) ((y1,y2):ys) npY xos yos
+            | x2 > x1 && x1 > 0 && y2 /= 0 =
+-}
 
 svg1d tRow tRes nRow (x,dR) = svgHeader fName (2*xMargin+tRow*deltaX+14*fSize) (2*yMargin+nRow*deltaY) ++
                               svgArray x 0 0 dR ++
