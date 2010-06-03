@@ -127,8 +127,8 @@ perpCompat pX@(x@(x1,x2):xs) pY@((y1,y2):_)
           reducePerp (x1,x2) ((y1,y2):ys) npY 
                      | x2 > x1 && x2 /= 0 && y2 /= 0 = reducePerp (x1,x2-1) ys $ (y1,y2-1):npY
                      | x1 > x2 && x1 /= 0 && y1 /= 0 = reducePerp (x1-1,x2) ys $ (y1-1,y2):npY
-                     | x1 /= 0 && y1 /= 0 = reducePerp (x1-1,x2) ys $ (y1-1,y2):npY
                      | x2 /= 0 && y2 /= 0 = reducePerp (x1,x2-1) ys $ (y1,y2-1):npY
+                     | x1 /= 0 && y1 /= 0 = reducePerp (x1-1,x2) ys $ (y1-1,y2):npY
                      | otherwise          = [(-1,-1)]
 
 optSizes = [(14,14,2),(10,15,3),(7,14,4),(6,15,5),(5,15,6),(4,14,7),(4,16,8),(4,18,9),(3,15,10)]
@@ -175,10 +175,10 @@ svgArray2 pX pY dR = svgArrayP pX pY yMargin
               reducePerp (x1,x2-1) ys (xP+deltaX) yos ((svgBox xP yos parColor)++xLine,(y1,y2-1):npY)
             | x1 > x2 && x1 /= 0 && y1 /= 0 =
               reducePerp (x1-1,x2) ys (xP+deltaX) yos ((svgBox xP yos serColor)++xLine,(y1-1,y2):npY)
-            | x1 /= 0 && y1 /= 0 =
-              reducePerp (x1-1,x2) ys (xP+deltaX) yos ((svgBox xP yos serColor)++xLine,(y1-1,y2):npY)
             | x2 /= 0 && y2 /= 0 =
               reducePerp (x1,x2-1) ys (xP+deltaX) yos ((svgBox xP yos parColor)++xLine,(y1,y2-1):npY)
+            | x1 /= 0 && y1 /= 0 =
+              reducePerp (x1-1,x2) ys (xP+deltaX) yos ((svgBox xP yos serColor)++xLine,(y1-1,y2):npY)
             | otherwise          = ("",[(-1,-1)])
 
 svg1d tRow tRes nRow (x,dR) = svgHeader fName (2*xMargin+tRow*deltaX+9*fSize) (2*yMargin+nRow*deltaY) ++
