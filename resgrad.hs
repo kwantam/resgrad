@@ -156,8 +156,9 @@ fSize = 30
 parColor = "purple"
 serColor = "silver"
 
-svgHeader fName w h = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\""
+svgHeader fName w h desc = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\""
                       ++show w++"\" height=\""++show h++"\"><title>"++fName++"</title>"
+                      ++"\n\n<desc>"++desc++"</desc>\n\n"
 svgTail = "</svg>"
 
 svgBox xos yos color = 
@@ -198,13 +199,16 @@ svgArray22 pX@((x1,x2):_) pY@((y1,y2):_) dR
                               then Just $ svgBox xos yos parColor ++ fromJust rpR2n
                               else Nothing
 
-svg1d tRow tRes nRow (x,dR) = svgHeader fName (2*xMargin+tRow*deltaX+14*fSize) (2*yMargin+nRow*deltaY) ++
+svg1d tRow tRes nRow (x,dR) = svgHeader fName (2*xMargin+tRow*deltaX+14*fSize)
+                                              (2*yMargin+nRow*deltaY)
+                                              (show x) ++
                               svgArray x 0 0 dR ++
                               svgTail
         where fName = show nRow ++ "_" ++ show tRes ++ "_" ++ show dR ++ ".svg"
 
-svg2d tRow tRes nRow (x,y,dR) = svgHeader fName (max (2*xMargin+tRow*deltaX) 
-                                                     (14*fSize)) (2*yMargin+nRow*deltaY+2*fSize) ++
+svg2d tRow tRes nRow (x,y,dR) = svgHeader fName (max (2*xMargin+tRow*deltaX) (14*fSize)) 
+                                                (2*yMargin+nRow*deltaY+2*fSize) 
+                                                (show x ++ ":" ++ show y) ++
                                 svgArray22 x y dR ++
                                 svgTail
         where fName = show nRow ++ "_" ++ show tRes ++ "_" ++ show dR ++ ".svg"
