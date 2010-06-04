@@ -46,7 +46,7 @@ import Data.List (foldl', sortBy)
 import Control.Parallel.Strategies (NFData(..),rnf)
 import Control.Parallel (par)
 import System (getArgs,getProgName,exitFailure)
-import Data.Maybe (fromMaybe,Maybe(..))
+import Data.Maybe (fromMaybe,Maybe(..),fromJust,isJust)
 
 -- compute the gain given dR and a specification of resistors by row
 resGainL dR nSx = seriesValue / parallelValue
@@ -94,7 +94,8 @@ zipGains dR dVal rows = rnf v1 `par` rnf v2 `seq` zipX rows v1 v2
           v1 = (genValues r1) :: [Double]
           v2 = (genValues r2) :: [Double]
 
--- combine one spec with a list of perpendicular ones which may or may not be compatible
+-- combine one spec with a list of perpendicular ones
+-- only retains results which are deemed compatible
 combPerp _       []           = []
 combPerp (rx,dx) ((ry,dy):ys) 
            | perpCompat2 rx ry = (rx,ry,dx*dy) : combPerp (rx,dx) ys
@@ -110,29 +111,17 @@ combPerpsS xs ys = sortBy cmpErrC $ combPerps xs ys
 minErr d1@(_,a) d2@(_,b) | a-1 < b-1 = d1
                          | otherwise = d2
 
+-- compare two 1-d errors for use with sort
 cmpErr (_,a) (_,b) | a-1 < b-1 = LT
                    | otherwise = GT
 
+-- compare two 2-d errors for use with sort
 cmpErrC (_,_,a) (_,_,b) | a-1 < b-1 = LT
                         | otherwise = GT
 
 -- foldl1, strictly to prevent stack overflow
 foldl1' _ []     = error "empty list"
 foldl1' f (x:xs) = foldl' f x xs
-
--- are these two perpendicular specs compatible?
-perpCompat []                _   = True
-perpCompat pX@(x@(x1,x2):xs) pY@((y1,y2):_)
-            | length pX /= y1+y2 = False
-            | length pY /= x1+x2 = False
-            | otherwise          = perpCompat xs $ reducePerp x pY []
-    where reducePerp (0,0)   []           npY = reverse npY
-          reducePerp (x1,x2) ((y1,y2):ys) npY 
-                     | x2 > x1 && x2 /= 0 && y2 /= 0 = reducePerp (x1,x2-1) ys $ (y1,y2-1):npY
-                     | x1 > x2 && x1 /= 0 && y1 /= 0 = reducePerp (x1-1,x2) ys $ (y1-1,y2):npY
-                     | x2 /= 0 && y2 /= 0 = reducePerp (x1,x2-1) ys $ (y1,y2-1):npY
-                     | x1 /= 0 && y1 /= 0 = reducePerp (x1-1,x2) ys $ (y1-1,y2):npY
-                     | otherwise          = [(-1,-1)]
 
 -- second attempt at perpendicular spec compatibility test
 -- this time, we include backtracking when we have a
@@ -144,11 +133,11 @@ perpCompat2 pX@((x1,x2):_) pY@((y1,y2):_)
     where reducePerp []           _            []  = True
           reducePerp (( 0, 0):xs) []           npY = reducePerp xs (reverse npY) []
           reducePerp ((x1,x2):xs) ((y1,y2):ys) npY
-             | x2 > x1 && x1 > 0 && y2 /= 0 = rPx2 || rPx1
-             | x1 > x2 && x2 > 0 && y1 /= 0 = rPx1 || rPx2
-             | x2 /= 0 && y2 /= 0           = rPx2
-             | x1 /= 0 && y1 /= 0           = rPx1
-             | otherwise                    = False
+             | x2 > x1 && x1 > 0 && y1 > 0 && y2 > 0 = rPx2 || rPx1
+             | x1 > x2 && x2 > 0 && y1 > 0 && y2 > 0 = rPx1 || rPx2
+             | x2 > 0  && y2 > 0                     = rPx2
+             | x1 > 0  && y1 > 0                     = rPx1
+             | otherwise                             = False
                  where rPx1 = reducePerp ((x1-1,x2):xs) ys ((y1-1,y2):npY)
                        rPx2 = reducePerp ((x1,x2-1):xs) ys ((y1,y2-1):npY)
 
@@ -185,41 +174,38 @@ svgShowdR dR xos yos =
    "<text x=\""++show xos++"\" y=\""++show yos++"\" font-size=\""++show fSize++"\">"
    ++(show $ (fromIntegral (round (dR*1e12)))/1e12)++"</text>"
 
-svgArray2 pX pY dR = svgArrayP pX pY yMargin
-    where svgArrayP _ [(-1,-1)] _ = []  -- error signaled from reducePerp, shouldn't happen!
-          svgArrayP []     _  yos = svgShowdR dR (2*xMargin) (yos+deltaY)
-          svgArrayP (x:xs) pY yos = xLine ++ svgArrayP xs (reverse npY) (yos+deltaY)
-              where (xLine,npY) = reducePerp x pY xMargin yos ([],[])
-          reducePerp (0,0)   _            _  _   xnp         = xnp
-          reducePerp (x1,x2) ((y1,y2):ys) xP yos (xLine,npY)
-            | x2 > x1 && x2 /= 0 && y2 /= 0 =
-              reducePerp (x1,x2-1) ys (xP+deltaX) yos ((svgBox xP yos parColor)++xLine,(y1,y2-1):npY)
-            | x1 > x2 && x1 /= 0 && y1 /= 0 =
-              reducePerp (x1-1,x2) ys (xP+deltaX) yos ((svgBox xP yos serColor)++xLine,(y1-1,y2):npY)
-            | x2 /= 0 && y2 /= 0 =
-              reducePerp (x1,x2-1) ys (xP+deltaX) yos ((svgBox xP yos parColor)++xLine,(y1,y2-1):npY)
-            | x1 /= 0 && y1 /= 0 =
-              reducePerp (x1-1,x2) ys (xP+deltaX) yos ((svgBox xP yos serColor)++xLine,(y1-1,y2):npY)
-            | otherwise          = ("",[(-1,-1)])
-
-{-
+-- the new version uses backtracking to exhaustively search
+-- out a solution if one exists
+-- also, it's a bit prettier as far as I'm concerned.
 svgArray22 pX@((x1,x2):_) pY@((y1,y2):_) dR
-            | length pX /= y1+y2 = False
-            | length pY /= x1+x2 = False
-            | otherwise          = fromMaybe "" $ reducePerp pX pY [] xMargin 0
+            | length pX /= y1+y2 = ""
+            | length pY /= x1+x2 = ""
+            | otherwise          = fromMaybe "" $ reducePerp pX pY [] xMargin yMargin
     where reducePerp []           _            []  _   yos = Just $ svgShowdR dR (2*xMargin) (yos+deltaY)
-          reducePerp (( 0, 0):xs) []           npY _   yos = reducePerp xs (reverse npY) xMargin (yos+deltaY)
+          reducePerp (( 0, 0):xs) []           npY _   yos = reducePerp xs (reverse npY) [] xMargin (yos+deltaY)
           reducePerp ((x1,x2):xs) ((y1,y2):ys) npY xos yos
-            | x2 > x1 && x1 > 0 && y2 /= 0 =
--}
+            | x2 > x1 && x1 > 0 && y1 > 0 && y2 > 0 = if isJust rpR2 then rpR2 else rpR1
+            | x1 > x2 && x2 > 0 && y1 > 0 && y2 > 0 = if isJust rpR1 then rpR1 else rpR2
+            | x2 > 0  && y2 > 0                     = rpR2
+            | x1 > 0  && y1 > 0                     = rpR1
+            | otherwise                             = Nothing
+                where rpR1n = reducePerp ((x1-1,x2):xs) ys ((y1-1,y2):npY) (xos+deltaX) yos
+                      rpR2n = reducePerp ((x1,x2-1):xs) ys ((y1,y2-1):npY) (xos+deltaX) yos
+                      rpR1 = if isJust rpR1n
+                              then Just $ svgBox xos yos serColor ++ fromJust rpR1n
+                              else Nothing
+                      rpR2 = if isJust rpR2n
+                              then Just $ svgBox xos yos parColor ++ fromJust rpR2n
+                              else Nothing
 
 svg1d tRow tRes nRow (x,dR) = svgHeader fName (2*xMargin+tRow*deltaX+14*fSize) (2*yMargin+nRow*deltaY) ++
                               svgArray x 0 0 dR ++
                               svgTail
         where fName = show nRow ++ "_" ++ show tRes ++ "_" ++ show dR ++ ".svg"
 
-svg2d tRow tRes nRow (x,y,dR) = svgHeader fName (max (2*xMargin+tRow*deltaX) (14*fSize)) (2*yMargin+nRow*deltaY+2*fSize) ++
-                                svgArray2 x y dR ++
+svg2d tRow tRes nRow (x,y,dR) = svgHeader fName (max (2*xMargin+tRow*deltaX) 
+                                                     (14*fSize)) (2*yMargin+nRow*deltaY+2*fSize) ++
+                                svgArray22 x y dR ++
                                 svgTail
         where fName = show nRow ++ "_" ++ show tRes ++ "_" ++ show dR ++ ".svg"
 
