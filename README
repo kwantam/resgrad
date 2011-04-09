@@ -1,0 +1,42 @@
+-- Copyright (C) 2010 Riad S Wahby <rsw@jfet.org>
+-- 
+-- This file is part of resgrad
+--
+--  resgrad is free software.  It comes without any warranty, to
+--  to the extent permitted by applicable law.  You can redistribute it
+--  and/or modify it under the terms of the Do What The Fuck You Want To
+--  Public License, Version 2, as published by Sam Hocevar.  See
+--  the COPYING file or http://sam.zoy.org/wtfpl/COPYING for more details
+--
+
+{-
+ - When attempting to make a pair of resistors with a large ratio, it is
+ - optimal to devote equivalent area to each resistor.  As such, the most
+ - obviously ideal ratios are those which are perfect squares; this allows
+ - one string of sqrt(R) in series, and one string of sqrt(R) in parallel,
+ - devoting equal area to each resistor and resulting in a ratio R.
+ -
+ - Unfortunately, laying out such resistors to be gradient insensitive is
+ - not as simple as when matching two resistors of equal value: after some
+ - thought it should be obvious that common centroiding does not work to
+ - cancel the effect of gradients, since one resistor accumulates errors
+ - linearly and the other as 1/delta.  As a result, the "correct" layout for
+ - a given set of resistors can be very nonintuitive.
+ -
+ - This software performs 2d optimization of a resistor pack in the presence
+ - of linear gradients in X and Y of specified magnitude.  It is assumed
+ - that the resistor ratio is equal to nUnits^2, i.e., the resistors will be
+ - nUnits in parallel and in series.  The results are written to the present
+ - directory in the form of the nOut best configurations.
+ -
+ - Usage:
+ -
+ - resgrad <nUnits> <nRows> <deltaY> <deltaX> <nOut>
+ -   nUnits : the number of units per resistor
+ -   nRows  : the number of rows into which to split
+ -     NOTE: nRows must evenly divide 2*nUnits!
+ -   deltaY : deltaRho/Rho between top-most and bottom-most row
+ -   deltaX : deltaRho/Rho between left-most and right-most row
+ -   nOut   : output the nOut best configurations
+ -}
+
