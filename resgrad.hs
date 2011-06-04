@@ -43,7 +43,7 @@
 module Main where
 
 import Data.List (foldl', sortBy)
-import Control.Parallel.Strategies (NFData(..),rnf)
+import Control.DeepSeq (NFData(..),rnf)
 import Control.Parallel (par)
 import System (getArgs,getProgName,exitFailure)
 import Data.Maybe (fromMaybe,Maybe(..),fromJust,isJust)
