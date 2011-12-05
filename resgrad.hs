@@ -44,7 +44,7 @@ module Main where
 
 import Data.List (foldl', sortBy)
 import Control.DeepSeq (NFData(..),rnf)
-import Control.Parallel (par)
+import Control.Parallel (par,pseq)
 import System (getArgs,getProgName,exitFailure)
 import Data.Maybe (fromMaybe,Maybe(..),fromJust,isJust)
 
@@ -75,7 +75,7 @@ optimalNLs tRow tRes nRow dR =
 
 -- create a list of 2-d resistor configurations (up to nP in length)
 -- optimizing for combined gradient insensitivity in X and Y directions
-optimalNLs2dS tRow tRes nRow dRx dRy nP = rnf xs `par` rnf ys `seq` take nP $ combPerpsS xs ys
+optimalNLs2dS tRow tRes nRow dRx dRy nP = rnf xs `par` rnf ys `pseq` take nP $ combPerpsS xs ys
     where xs = take (2*nP) $ optimalNLs tRow tRes nRow (dRx / (fromIntegral $ nRow - 1))
           ys = take (2*nP) $ optimalNLs nRow tRes tRow (dRy / (fromIntegral $ tRow - 1))
 
@@ -83,7 +83,7 @@ optimalNLs2dS tRow tRes nRow dRx dRy nP = rnf xs `par` rnf ys `seq` take nP $ co
 -- this version splits the rows to compute into two lists and computes them in parallel
 -- it would be better to detect how many processes are being run and split into a
 -- corresponding number of threads
-zipGains dR dVal rows = rnf v1 `par` rnf v2 `seq` zipX rows v1 v2
+zipGains dR dVal rows = rnf v1 `par` rnf v2 `pseq` zipX rows v1 v2
     where zipX (r:rs) (v1:v1s) v2s = (r,v1) : zipX rs v1s v2s
           zipX (r:rs) []  (v2:v2s) = (r,v2) : zipX rs [] v2s
           zipX _      []  []       = []
